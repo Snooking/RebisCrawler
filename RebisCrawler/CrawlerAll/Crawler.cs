@@ -17,15 +17,24 @@ namespace RebisCrawler.CrawlerAll
             _httpClient = new HttpClient();
         }
 
-        public async Task<string> DownloadPage() => await _httpClient.GetStringAsync(_url);
-
         public async Task<Book> GetBook()
         {
-            var page = await DownloadPage();
+            var page = await _httpClient.GetStringAsync(_url);
 
             var htmlDocument = new HtmlDocument();
             htmlDocument.LoadHtml(page);
 
+            var book = new Book
+            {
+                Title = GetTitle(htmlDocument),
+                Details = GetDetails(htmlDocument),
+                Description = GetDescription(htmlDocument)
+            };
+            return book;
+        }
+
+        private static TitleModel GetTitle(HtmlDocument htmlDocument)
+        {
             var titleSectionHtml = htmlDocument.DocumentNode.SelectNodes("//title");
 
             var titleSection = titleSectionHtml[0].InnerText;
@@ -34,29 +43,73 @@ namespace RebisCrawler.CrawlerAll
 
             var title = titleSectionArray[0].Replace("&quot", string.Empty).Trim(' ', ';');
             var author = titleSectionArray[1].Trim(' ', ';');
-            //var title = titleSection
 
-            //System.Console.WriteLine(title);
+            return new TitleModel
+            {
+                Title = title,
+                Author = author
+            };
+        }
 
-            return new Book
+        private static DescriptionModel GetDescription(HtmlDocument htmlDocument)
+        {
+
+            return new DescriptionModel
             {
 
             };
         }
 
-        private static HtmlNode GetNextDDSibling(HtmlNode dtElement)
+        private static DetailsModel GetDetails(HtmlDocument htmlDocument)
         {
-            var currentNode = dtElement;
+            return new DetailsModel
+            {
+                BookSerie = GetDdElement(htmlDocument, nameof(DetailsModel.BookSerie)),
+                BookCover = GetDdElement(htmlDocument, nameof(DetailsModel.BookCover)),
+                BookEdition = GetDdElement(htmlDocument, nameof(DetailsModel.BookEdition)),
+                BookFormatsize = GetDdElement(htmlDocument, nameof(DetailsModel.BookFormatsize)),
+                BookIsbn = GetDdElement(htmlDocument, nameof(DetailsModel.BookIsbn)),
+                BookOrigin = GetDdElement(htmlDocument, nameof(DetailsModel.BookOrigin)),
+                BookOriginalEditionDate = GetDdElement(htmlDocument, nameof(DetailsModel.BookOriginalEditionDate)),
+                BookPagescount = GetDdElement(htmlDocument, nameof(DetailsModel.BookPagescount)),
+                BookTranslator = GetDdElement(htmlDocument, nameof(DetailsModel.BookTranslator)),
+            };
+        }
+
+        private static string GetDdElement(HtmlDocument htmlDocument, string name)
+        {
+            var nameCorrect = string.Concat(name
+                .Select(c => char.IsUpper(c) ?
+                "-" + c.ToString().ToLower() :
+                c.ToString().ToLower()))
+                .TrimStart('-');
+
+            var ddElement = htmlDocument.DocumentNode.SelectNodes("//dd[contains(@class, '" + nameCorrect + "')]");
+
+            var currentNode = ddElement?[0];
 
             while (currentNode != null)
             {
-                currentNode = currentNode.NextSibling;
-
                 if (currentNode.NodeType == HtmlNodeType.Element && currentNode.Name == "dd")
-                    return currentNode;
+                {
+                    return PrepareText(currentNode.InnerText);
+                }
+
+                currentNode = currentNode.NextSibling;
             }
 
             return null;
+        }
+
+        private static string PrepareText(string text)
+        {
+            var correctText = text.Trim().Replace("\r\n", string.Empty); ;
+            while (correctText.Contains("  "))
+            {
+                correctText = correctText.Replace("  ", " ");
+            }
+
+            return correctText;
         }
     }
 }
