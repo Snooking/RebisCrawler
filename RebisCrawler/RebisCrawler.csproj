@@ -57,6 +57,7 @@
     <Compile Include="Models\Book.cs" />
     <Compile Include="Models\DescriptionModel.cs" />
     <Compile Include="Models\DetailsModel.cs" />
+    <Compile Include="Models\PriceModel.cs" />
     <Compile Include="Models\TitleModel.cs" />
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />

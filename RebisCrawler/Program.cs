@@ -1,5 +1,6 @@
 ﻿using RebisCrawler.CrawlerAll;
 using System;
+using System.Text;
 using System.Threading.Tasks;
 
 namespace RebisCrawler
@@ -14,6 +15,7 @@ namespace RebisCrawler
             {
                 var crawler = new Crawler(Url);
                 var book = await crawler.GetBook();
+                Console.OutputEncoding = Encoding.UTF8;
                 Console.WriteLine(book.Title.Title);
                 Console.WriteLine(book.Title.Author);
                 Console.WriteLine("BookCover: " + book.Details.BookCover);
@@ -25,6 +27,20 @@ namespace RebisCrawler
                 Console.WriteLine("BookOriginalEditionDate: " + book.Details.BookOriginalEditionDate);
                 Console.WriteLine("BookPagescount: " + book.Details.BookPagescount);
                 Console.WriteLine("BookTranslator: " + book.Details.BookTranslator);
+                Console.WriteLine();
+                Console.WriteLine("BookFilter: " + book.BookPrice.BookFilter);
+                Console.WriteLine("Price: " + book.BookPrice.Price);
+                Console.WriteLine("OldPrice: " + book.BookPrice.OldPrice);
+                Console.WriteLine("OldPriceInfo: " + book.BookPrice.OldPriceInfo);
+                Console.WriteLine();
+                Console.WriteLine("eBookFilter: " + book.EBookPrice.BookFilter);
+                Console.WriteLine("ePrice: " + book.EBookPrice.Price);
+                Console.WriteLine("eOldPrice: " + book.EBookPrice.OldPrice);
+                Console.WriteLine("eOldPriceInfo: " + book.EBookPrice.OldPriceInfo);
+                Console.WriteLine();
+                Console.WriteLine("Description: " + book.Description.Description);
+                Console.WriteLine("BookDescription: " + book.Description.BookDescription);
+                Console.WriteLine("AuthorBiogram: " + book.Description.AuthorBiogram);
                 Console.ReadLine();
             }).GetAwaiter().GetResult();
         }

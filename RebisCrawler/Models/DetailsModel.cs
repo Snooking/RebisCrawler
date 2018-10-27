@@ -11,6 +11,5 @@
         public string BookOriginalEditionDate { get; set; }
         public string BookPagescount { get; set; }
         public string BookFormatsize { get; set; }
-
     }
 }

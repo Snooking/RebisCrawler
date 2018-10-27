@@ -2,6 +2,7 @@
 using RebisCrawler.Models;
 using System.Linq;
 using System.Net.Http;
+using System.Text;
 using System.Threading.Tasks;
 
 namespace RebisCrawler.CrawlerAll
@@ -10,81 +11,106 @@ namespace RebisCrawler.CrawlerAll
     {
         private string _url;
         private HttpClient _httpClient;
+        private HtmlDocument _htmlDocument;
 
         public Crawler(string url)
         {
             _url = url;
             _httpClient = new HttpClient();
+            _htmlDocument = new HtmlDocument();
         }
 
         public async Task<Book> GetBook()
         {
-            var page = await _httpClient.GetStringAsync(_url);
+            var response = await _httpClient.GetByteArrayAsync(_url);
+            var page = Encoding.UTF8.GetString(response);
 
-            var htmlDocument = new HtmlDocument();
-            htmlDocument.LoadHtml(page);
+            _htmlDocument.LoadHtml(page);
 
             var book = new Book
             {
-                Title = GetTitle(htmlDocument),
-                Details = GetDetails(htmlDocument),
-                Description = GetDescription(htmlDocument)
+                Title = GetTitle(),
+                Details = GetDetails(),
+                BookPrice = GetPrice(),
+                EBookPrice = GetPrice(true),
+                Description = GetDescription()
             };
             return book;
         }
 
-        private static TitleModel GetTitle(HtmlDocument htmlDocument)
+        private TitleModel GetTitle()
         {
-            var titleSectionHtml = htmlDocument.DocumentNode.SelectNodes("//title");
+            var title = _htmlDocument.DocumentNode.SelectNodes("//h1[contains(@itemprop, 'name')]");
+            var author = _htmlDocument.DocumentNode.SelectNodes("//a[contains(@class, 'author title')]");
 
-            var titleSection = titleSectionHtml[0].InnerText;
-
-            var titleSectionArray = titleSection.Split(',');
-
-            var title = titleSectionArray[0].Replace("&quot", string.Empty).Trim(' ', ';');
-            var author = titleSectionArray[1].Trim(' ', ';');
+            var titleText = title[0].InnerText.Replace("&#243;", "ó").TrimStart('\r', '\n');
+            var index = titleText.IndexOf("\r\n");
+            titleText = titleText.Remove(index);
 
             return new TitleModel
             {
-                Title = title,
-                Author = author
+                Title = PrepareText(titleText),
+                Author = PrepareText(author[0].InnerText)
             };
         }
 
-        private static DescriptionModel GetDescription(HtmlDocument htmlDocument)
+        private DescriptionModel GetDescription()
         {
+            var description = _htmlDocument.DocumentNode.SelectNodes
+                ("//div[contains(@itemprop, '" + PrepareCorrectName(nameof(DescriptionModel.Description)) + "')]");
+            var bookDescription = _htmlDocument.DocumentNode.SelectNodes
+                ("//div[contains(@class, '" + PrepareCorrectName(nameof(DescriptionModel.BookDescription)) + "')]");
+            var authorBiogram = _htmlDocument.DocumentNode.SelectNodes
+                 ("//div[contains(@class, '" + PrepareCorrectName(nameof(DescriptionModel.AuthorBiogram)) + "')]");
 
             return new DescriptionModel
             {
-
+                Description = PrepareText(description[0].InnerText),
+                BookDescription = PrepareText(bookDescription[1].InnerText),
+                AuthorBiogram = PrepareText(authorBiogram[0].InnerText)
             };
         }
 
-        private static DetailsModel GetDetails(HtmlDocument htmlDocument)
+        private PriceModel GetPrice(bool eBook = false)
+        {
+            var bookFilter = _htmlDocument.DocumentNode.SelectNodes
+                ("//h4[contains(@data-option, '" + PrepareCorrectName(nameof(PriceModel.BookFilter)) + "')]");
+            var price = _htmlDocument.DocumentNode.SelectNodes
+                ("//span[contains(@class, '" + PrepareCorrectName(nameof(PriceModel.Price)) + "')]");
+            var oldPrice = _htmlDocument.DocumentNode.SelectNodes
+                ("//span[contains(@class, 'oldPrice')]");
+            var oldPriceInfo = _htmlDocument.DocumentNode.SelectNodes
+                ("//span[contains(@class, 'oldPriceInfo')]");
+            return new PriceModel
+            {
+                BookFilter = PrepareText(bookFilter[eBook ? 1 : 0].InnerText),
+                Price = PrepareText(price[eBook ? 1 : 0].InnerText),
+                OldPrice = PrepareText(oldPrice[eBook ? 1 : 0].InnerText),
+                OldPriceInfo = PrepareText(oldPriceInfo[eBook ? 1 : 0].InnerText)
+            };
+        }
+
+        private DetailsModel GetDetails()
         {
             return new DetailsModel
             {
-                BookSerie = GetDdElement(htmlDocument, nameof(DetailsModel.BookSerie)),
-                BookCover = GetDdElement(htmlDocument, nameof(DetailsModel.BookCover)),
-                BookEdition = GetDdElement(htmlDocument, nameof(DetailsModel.BookEdition)),
-                BookFormatsize = GetDdElement(htmlDocument, nameof(DetailsModel.BookFormatsize)),
-                BookIsbn = GetDdElement(htmlDocument, nameof(DetailsModel.BookIsbn)),
-                BookOrigin = GetDdElement(htmlDocument, nameof(DetailsModel.BookOrigin)),
-                BookOriginalEditionDate = GetDdElement(htmlDocument, nameof(DetailsModel.BookOriginalEditionDate)),
-                BookPagescount = GetDdElement(htmlDocument, nameof(DetailsModel.BookPagescount)),
-                BookTranslator = GetDdElement(htmlDocument, nameof(DetailsModel.BookTranslator)),
+                BookSerie = GetDdElement(nameof(DetailsModel.BookSerie)),
+                BookCover = GetDdElement(nameof(DetailsModel.BookCover)),
+                BookEdition = GetDdElement(nameof(DetailsModel.BookEdition)),
+                BookFormatsize = GetDdElement(nameof(DetailsModel.BookFormatsize)),
+                BookIsbn = GetDdElement(nameof(DetailsModel.BookIsbn)),
+                BookOrigin = GetDdElement(nameof(DetailsModel.BookOrigin)),
+                BookOriginalEditionDate = GetDdElement(nameof(DetailsModel.BookOriginalEditionDate)),
+                BookPagescount = GetDdElement(nameof(DetailsModel.BookPagescount)),
+                BookTranslator = GetDdElement(nameof(DetailsModel.BookTranslator)),
             };
         }
 
-        private static string GetDdElement(HtmlDocument htmlDocument, string name)
+        private string GetDdElement(string name)
         {
-            var nameCorrect = string.Concat(name
-                .Select(c => char.IsUpper(c) ?
-                "-" + c.ToString().ToLower() :
-                c.ToString().ToLower()))
-                .TrimStart('-');
+            var nameCorrect = PrepareCorrectName(name);
 
-            var ddElement = htmlDocument.DocumentNode.SelectNodes("//dd[contains(@class, '" + nameCorrect + "')]");
+            var ddElement = _htmlDocument.DocumentNode.SelectNodes("//dd[contains(@class, '" + nameCorrect + "')]");
 
             var currentNode = ddElement?[0];
 
@@ -99,6 +125,15 @@ namespace RebisCrawler.CrawlerAll
             }
 
             return null;
+        }
+
+        private static string PrepareCorrectName(string name)
+        {
+            return string.Concat(name
+                .Select(c => char.IsUpper(c) ?
+                "-" + c.ToString().ToLower() :
+                c.ToString().ToLower()))
+                .TrimStart('-');
         }
 
         private static string PrepareText(string text)
