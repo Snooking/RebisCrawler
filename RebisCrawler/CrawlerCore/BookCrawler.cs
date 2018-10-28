@@ -1,28 +1,27 @@
 ﻿using HtmlAgilityPack;
 using RebisCrawler.Models;
+using System;
 using System.Linq;
 using System.Net.Http;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace RebisCrawler.CrawlerAll
+namespace RebisCrawler.CrawlerCore
 {
-    internal class Crawler
+    internal class BookCrawler
     {
-        private string _url;
         private HttpClient _httpClient;
         private HtmlDocument _htmlDocument;
 
-        public Crawler(string url)
+        public BookCrawler()
         {
-            _url = url;
             _httpClient = new HttpClient();
             _htmlDocument = new HtmlDocument();
         }
 
-        public async Task<Book> GetBook()
+        public async Task<Book> GetBook(string url, string category)
         {
-            var response = await _httpClient.GetByteArrayAsync(_url);
+            var response = await _httpClient.GetByteArrayAsync(url);
             var page = Encoding.UTF8.GetString(response);
 
             _htmlDocument.LoadHtml(page);
@@ -33,9 +32,17 @@ namespace RebisCrawler.CrawlerAll
                 Details = GetDetails(),
                 BookPrice = GetPrice(),
                 EBookPrice = GetPrice(true),
-                Description = GetDescription()
+                Description = GetDescription(),
+                ImagePath = GetImage(),
+                CategoryPath = category
             };
             return book;
+        }
+
+        private string GetImage()
+        {
+            var title = _htmlDocument.DocumentNode.SelectNodes("//img[contains(@id, 'cover-img')]");
+            return title[0].GetAttributeValue("src", "alt");
         }
 
         private TitleModel GetTitle()
@@ -43,7 +50,7 @@ namespace RebisCrawler.CrawlerAll
             var title = _htmlDocument.DocumentNode.SelectNodes("//h1[contains(@itemprop, 'name')]");
             var author = _htmlDocument.DocumentNode.SelectNodes("//a[contains(@class, 'author title')]");
 
-            var titleText = title[0].InnerText.Replace("&#243;", "ó").TrimStart('\r', '\n');
+            var titleText = title[0].InnerText.TrimStart('\r', '\n');
             var index = titleText.IndexOf("\r\n");
             titleText = titleText.Remove(index);
 
@@ -65,29 +72,37 @@ namespace RebisCrawler.CrawlerAll
 
             return new DescriptionModel
             {
-                Description = PrepareText(description[0].InnerText),
-                BookDescription = PrepareText(bookDescription[1].InnerText),
-                AuthorBiogram = PrepareText(authorBiogram[0].InnerText)
+                Description = PrepareText(description[0].InnerText.Replace("\n", string.Empty).Replace(";", ",")),
+                BookDescription = PrepareText(bookDescription[1].InnerText.Replace("\n", string.Empty).Replace(";", ",")),
+                AuthorBiogram = PrepareText(authorBiogram[0].InnerText.Replace("\n", string.Empty).Replace(";", ","))
             };
         }
 
         private PriceModel GetPrice(bool eBook = false)
         {
-            var bookFilter = _htmlDocument.DocumentNode.SelectNodes
-                ("//h4[contains(@data-option, '" + PrepareCorrectName(nameof(PriceModel.BookFilter)) + "')]");
-            var price = _htmlDocument.DocumentNode.SelectNodes
-                ("//span[contains(@class, '" + PrepareCorrectName(nameof(PriceModel.Price)) + "')]");
-            var oldPrice = _htmlDocument.DocumentNode.SelectNodes
-                ("//span[contains(@class, 'oldPrice')]");
-            var oldPriceInfo = _htmlDocument.DocumentNode.SelectNodes
-                ("//span[contains(@class, 'oldPriceInfo')]");
-            return new PriceModel
+            try
             {
-                BookFilter = PrepareText(bookFilter[eBook ? 1 : 0].InnerText),
-                Price = PrepareText(price[eBook ? 1 : 0].InnerText),
-                OldPrice = PrepareText(oldPrice[eBook ? 1 : 0].InnerText),
-                OldPriceInfo = PrepareText(oldPriceInfo[eBook ? 1 : 0].InnerText)
-            };
+                var bookFilter = _htmlDocument.DocumentNode.SelectNodes
+                ("//h4[contains(@data-option, '" + PrepareCorrectName(nameof(PriceModel.BookFilter)) + "')]");
+                var price = _htmlDocument.DocumentNode.SelectNodes
+                    ("//span[contains(@class, '" + PrepareCorrectName(nameof(PriceModel.Price)) + "')]");
+                var oldPrice = _htmlDocument.DocumentNode.SelectNodes
+                    ("//span[contains(@class, 'oldPrice')]");
+                var oldPriceInfo = _htmlDocument.DocumentNode.SelectNodes
+                    ("//span[contains(@class, 'oldPriceInfo')]");
+                return new PriceModel
+                {
+                    BookFilter = PrepareText(bookFilter[eBook ? 1 : 0].InnerText),
+                    Price = PrepareText((price[eBook ? 1 : 0].InnerText != "Przedpremiera" ? price[eBook ? 1 : 0].InnerText : "29.99").Replace(',', '.')),
+                    OldPrice = PrepareText(oldPrice[eBook ? 1 : 0].InnerText.Replace(',', '.')),
+                    OldPriceInfo = PrepareText(oldPriceInfo[eBook ? 1 : 0].InnerText)
+                };
+            }
+            catch
+            {
+                //Ignore
+            }
+            return new PriceModel();
         }
 
         private DetailsModel GetDetails()
@@ -138,7 +153,24 @@ namespace RebisCrawler.CrawlerAll
 
         private static string PrepareText(string text)
         {
-            var correctText = text.Trim().Replace("\r\n", string.Empty); ;
+            var correctText = text.Trim().Replace("\r\n", string.Empty);
+            correctText = correctText.Replace("&#243;", "ó");
+            correctText = correctText.Replace("&#233;", "é");
+            correctText = correctText.Replace("&#225;", "á");
+            correctText = correctText.Replace("&#241;", "ñ");
+            correctText = correctText.Replace("„", "\"");
+            correctText = correctText.Replace("”", "\"");
+            correctText = correctText.Replace("\"", "'");
+            try
+            {
+                var indexStart = correctText.IndexOf("&#");
+                var indexEnd = correctText.IndexOf(';', indexStart);
+                correctText = correctText.Remove(indexStart, indexEnd - indexStart + 1);
+            }
+            catch
+            {
+                //It's not fucked up, continue
+            }
             while (correctText.Contains("  "))
             {
                 correctText = correctText.Replace("  ", " ");

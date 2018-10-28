@@ -12,6 +12,7 @@
     <FileAlignment>512</FileAlignment>
     <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
     <Deterministic>true</Deterministic>
+    <TargetFrameworkProfile />
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
     <PlatformTarget>AnyCPU</PlatformTarget>
@@ -53,7 +54,9 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="CrawlerAll\Crawler.cs" />
+    <Compile Include="CrawlerCore\BookCrawler.cs" />
+    <Compile Include="CrawlerCore\LibraryCrawler.cs" />
+    <Compile Include="FileInterpreter\FileWriter.cs" />
     <Compile Include="Models\Book.cs" />
     <Compile Include="Models\DescriptionModel.cs" />
     <Compile Include="Models\DetailsModel.cs" />
