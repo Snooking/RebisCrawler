@@ -84,15 +84,21 @@ namespace RebisCrawler.CrawlerCore
             var books = htmlDocument.DocumentNode.SelectNodes
                 ("//div[contains(@class, 'BookListThumbnail')]//a");
 
-            Task.Run(async () =>
+            var listOfBooks = new List<Book>();
+
+            await Task.Run(async () =>
             {
                 foreach (var book in books)
                 {
                     var link = book.GetAttributeValue("href", "failed");
                     _writer = new FileWriter("C:\\Users\\Snooking\\Source\\Repos\\RebisCrawler\\RebisCrawler\\template.csv");
-                    _writer.WriteToFile(await _bookCrawler.GetBook(Url + link, category));
+                    listOfBooks.Add(await _bookCrawler.GetBook(Url + link, category));
                 }
             });
+            foreach (var book in listOfBooks)
+            {
+                _writer.WriteToFile(book);
+            }
         }
     }
 }
